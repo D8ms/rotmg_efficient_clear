@@ -10,11 +10,18 @@ from mss import mss
 import time
 from pubsub import pub
 import threading
+import os
+import sys
+
 
 class AppConfig:
     def __init__(self, configName):
+        if getattr(sys, 'frozen', False):
+            self.app_path = os.path.dirname(sys.executable)
+        elif __file__:
+            self.app_path = os.path.dirname(__file__)
         _config = configparser.ConfigParser()
-        _config.read(configName)
+        _config.read(os.path.join(self.app_path, configName))
         config = _config['Application']
         self.gui_width = int(config['GUI_WIDTH'])
         self.gui_height = int(config['GUI_HEIGHT'])
@@ -40,6 +47,10 @@ class AppConfig:
         
 class MYGUI:
     def __init__(self, config, sct):
+        if getattr(sys, 'frozen', False):
+            self.app_path = os.path.dirname(sys.executable)
+        elif __file__:
+            self.app_path = os.path.dirname(__file__)
         self.config = config
         self.root = Tk()
         self.root.geometry(str(config.gui_width) + "x" + str(config.gui_height))
@@ -112,15 +123,16 @@ class MYGUI:
         markerWidth = int(widthRatio * 36)
         markerHeight = int(heightRatio * 36)
         self.marker_activation_radius = (markerWidth + markerHeight) / 4
-        whitePi = ImageTk.PhotoImage(Image.open('mapCoords/whitemark.png').resize((markerWidth, markerHeight)))
-        greenPi = ImageTk.PhotoImage(Image.open('mapCoords/greenmark.png').resize((markerWidth, markerHeight)))
-        redPi = ImageTk.PhotoImage(Image.open('mapCoords/redmark.png').resize((markerWidth, markerHeight)))
+        mapCoord_path = os.path.join(self.app_path, 'mapCoords/')
+        whitePi = ImageTk.PhotoImage(Image.open(mapCoord_path + 'whitemark.png').resize((markerWidth, markerHeight)))
+        greenPi = ImageTk.PhotoImage(Image.open(mapCoord_path + 'greenmark.png').resize((markerWidth, markerHeight)))
+        redPi = ImageTk.PhotoImage(Image.open(mapCoord_path + 'redmark.png').resize((markerWidth, markerHeight)))
         self.markerPIs = [whitePi, greenPi, redPi]
         self.mapToMarkerCoords = []
         self.markerPiIdxs = [0] * 128
         self.markers = []
         for i in range(13):
-            coordPath = "mapCoords/map" + str(i+1) + ".txt"
+            coordPath = mapCoord_path + "map" + str(i+1) + ".txt"
             with open(coordPath) as fh:
                 coordData = []
                 for line in fh:
@@ -210,7 +222,7 @@ class MYGUI:
         self.mapIdx = 0
         for i in range(13):
             idx = i + 1
-            location = "MAPS/" + "map" + str(idx) + ".png"
+            location = os.path.join(self.app_path, "MAPS/" + "map" + str(idx) + ".png")
             map = Image.open(location)
             smaller_map = map.resize((self.gui_width, self.gui_height))
             pi = ImageTk.PhotoImage(smaller_map)
