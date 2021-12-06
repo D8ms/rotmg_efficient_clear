@@ -52,7 +52,7 @@ Common settings:
 
   1920x1080: MAP_X=1564, MAP_Y=4
 
-  2560x1440: MAP_X=468, MAP_Y=478
+  2560x1440: MAP_X=2085, MAP_Y=5
   
 **MINIMAP_WIDTH and MINI_MAP_HEIGHT**
 The width and height on the rotmg minimap  on your screen
