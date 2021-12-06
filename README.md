@@ -49,13 +49,17 @@ are the dimensions of the premade maps. These should not be changed unless you k
 **MAP_X and MAP_Y**
 Where the map starts relative to your monitor. If you have used Ontop Overlay before, you can pull the values from your saved settings.
 Common settings:
+
   1920x1080: MAP_X=1564, MAP_Y=4
+
   2560x1440: MAP_X=468, MAP_Y=478
   
 **MINIMAP_WIDTH and MINI_MAP_HEIGHT**
 The width and height on the rotmg minimap  on your screen
 Common settings:
+
   1920x1080: MINIMAP_WIDTH=352 , MINIMAP_HEIGHT=360
+
   2560x1440: MINIMAP_WIDTH=468 , MINIMAP_HEIGHT=478
   
 **ALPHA**
