@@ -12,6 +12,17 @@ from pubsub import pub
 import threading
 import os
 import sys
+import string
+
+import win32gui
+import win32con
+import keyboard
+
+from ctypes import c_long , c_int , c_uint , c_char , c_ubyte , c_char_p , c_void_p
+from ctypes import windll, Structure, sizeof, POINTER, pointer, cast, byref, create_string_buffer, addressof, WinDLL, c_size_t, c_void_p
+from ctypes.wintypes import DWORD, BYTE, HMODULE
+import win32process
+import struct
 
 
 class AppConfig:
@@ -26,6 +37,9 @@ class AppConfig:
         self.gui_width = int(config['GUI_WIDTH'])
         self.gui_height = int(config['GUI_HEIGHT'])
         self.gui_refresh_rate = int(config['GUI_REFRESH_RATE'])
+        self.use_pos_reader = config['use_pos_reader'].lower().strip() == 'true'
+        self.mark_key = config['MARK_KEY'].strip()
+        
         
         config = _config['Network']
         self.use_network = config['USE_NETWORK'].lower().strip() == 'true'
@@ -43,7 +57,168 @@ class AppConfig:
         self.map_x = int(config['MAP_X'])
         self.map_y = int(config['MAP_Y'])
         self.alpha = int(config['ALPHA'])
+        
+        config = _config['PeasantMode']
+        self.peasant_mode = config['PEASANT_MODE'].lower().strip() == 'true'
+        self.exit_key = config['EXIT_KEY'].strip()
+        self.pause_key = config['PAUSE_KEY'].strip()
+        self.fullsync_key = config['FULLSYNC_KEY'].strip()
 
+
+class MODULEENTRY32(Structure):
+    _fields_ = [( 'dwSize' , DWORD ) ,
+                ( 'th32ModuleID' , DWORD ),
+                ( 'th32ProcessID' , DWORD ),
+                ( 'GlblcntUsage' , DWORD ),
+                ( 'ProccntUsage' , DWORD ) ,
+                ( 'modBaseAddr' , POINTER(BYTE) ) ,
+                ( 'modBaseSize' , DWORD ) ,
+                ( 'hModule' , HMODULE ) ,
+                ( 'szModule' , c_char * 256 ),
+                ( 'szExePath' , c_char * 260 ) ]
+
+class PosReader:
+    def __init__(self):
+        self.app_name = "RotMGExalt"
+        self.module_name = "UnityPlayer.dll"
+        self.clear_cache()
+        
+    def clear_cache(self):
+        self.pid = None
+        self.process = None
+        self.base_addr = None
+        self.final_addr = None
+        
+    def get_pid(self):
+        hwnd = win32gui.FindWindow(None, self.app_name)
+        thread_id, pid = win32process.GetWindowThreadProcessId(hwnd)
+        return pid
+        
+    def get_base_addr(self):
+        TH32CS_SNAPMODULE = 0x00000008
+        TH32CS_SNAPMODULE32 = 0x00000010
+    
+        GetLastError = windll.kernel32.GetLastError
+        GetLastError.rettype = DWORD
+        
+        CloseHandle = windll.kernel32.CloseHandle
+        CloseHandle.argtypes = [ c_void_p ]
+        CloseHandle.rettype = c_int
+    
+        Module32First = windll.kernel32.Module32First
+        Module32First.argtypes = [ c_void_p , POINTER(MODULEENTRY32) ]
+        Module32First.rettype = c_int
+    
+        Module32Next = windll.kernel32.Module32Next
+        Module32Next.argtypes = [ c_void_p , POINTER(MODULEENTRY32) ]
+        Module32Next.rettype = c_int
+    
+        CreateToolhelp32Snapshot= windll.kernel32.CreateToolhelp32Snapshot
+        CreateToolhelp32Snapshot.reltype = DWORD
+        CreateToolhelp32Snapshot.argtypes = [ c_int , c_int ]
+    
+    
+        if self.pid is not None:
+            hModuleSnap = c_void_p(0)
+            me32 = MODULEENTRY32()
+            me32.dwSize = sizeof( MODULEENTRY32 )
+            hModuleSnap = CreateToolhelp32Snapshot( TH32CS_SNAPMODULE | TH32CS_SNAPMODULE32, self.pid )
+        
+            ret = Module32First( hModuleSnap, pointer(me32) )
+            if ret == 0 :
+                print ('ListProcessModules() Error on Module32First[%d]' % GetLastError())
+                CloseHandle( hModuleSnap )
+                return None
+            while ret :
+                compare = self.module_name.encode()
+                if me32.szModule == compare:
+                    return addressof(me32.modBaseAddr.contents)
+                ret = Module32Next( hModuleSnap , byref(me32) )
+            CloseHandle( hModuleSnap )
+        return None
+    
+    def get_cache_pid(self):
+        if not self.pid:
+            self.pid = self.get_pid()
+        return self.pid
+    
+    def get_cache_base_addr(self):
+        if not self.base_addr:
+            self.base_addr = self.get_base_addr()
+        return self.base_addr
+        
+    def get_cache_process(self):
+        OpenProcess = windll.kernel32.OpenProcess
+        OpenProcess.argtypes = [ c_void_p , c_int , DWORD ]
+        OpenProcess.rettype = DWORD    
+        
+        if not self.process:
+            pid = self.get_cache_pid()
+            if pid:
+                self.process = OpenProcess(0x0010, False, pid)
+        return self.process
+            
+    def get_cache_final_addr(self):
+        if not self.final_addr:
+            base_addr = self.get_cache_base_addr()
+            if not base_addr:
+                print("No base address")
+                return None
+            process = self.get_cache_process()
+            if not process:
+                print("No process")
+                return None
+            OFFSET1 = 0x017D59F8
+            OFFSET2 = 0x10
+            OFFSET3 = 0x140
+            OFFSET4 = 0x90
+        
+            ptr_size = struct.calcsize("P")
+            unpack_flag = "<Q"
+            if ptr_size == 4:
+                unpack_flag = "<L"
+            
+            address = self.read_process_memory(base_addr + OFFSET1, ptr_size, process)
+            address = struct.unpack(unpack_flag, address)[0]
+            address = self.read_process_memory(address + OFFSET2, ptr_size, process)
+            address = struct.unpack(unpack_flag, address)[0]
+            address = self.read_process_memory(address + OFFSET3, ptr_size, process)
+            address = struct.unpack(unpack_flag, address)[0]
+            self.final_addr = address + OFFSET4
+        return self.final_addr
+    
+    def get_xy(self):
+        process = self.get_cache_process()
+        if not process:
+            print("No process")
+            return None
+        final_addr = self.get_cache_final_addr()
+        if not final_addr:
+            print("No final address")
+            return None
+        p_x_buf = self.read_process_memory(final_addr, 4, process)
+        p_x = struct.unpack("<f", p_x_buf)[0]
+        p_y_buf = self.read_process_memory(final_addr + 0x4, 4, process)
+        p_y = struct.unpack("<f", p_y_buf)[0]
+        return(p_x, -p_y)
+        
+    def read_process_memory(self, address, size, hProcess, allow_partial=False):
+        ReadProcessMemory = windll.kernel32.ReadProcessMemory
+    
+        ERROR_PARTIAL_COPY = 0x012B
+        PROCESS_VM_READ = 0x0010
+        
+        buf = create_string_buffer(size)
+        nread = c_size_t()
+        #hProcess = kernel32.OpenProcess(PROCESS_VM_READ, False, p.pid)
+        #print(hex(address))
+        try:
+            ReadProcessMemory(hProcess, c_void_p(address), buf, size,
+                byref(nread))
+        except WindowsError as e:
+            if not allow_partial or e.winerror != ERROR_PARTIAL_COPY:
+                raise
+        return buf[:nread.value]               
         
 class MYGUI:
     def __init__(self, config, sct):
@@ -51,13 +226,46 @@ class MYGUI:
             self.app_path = os.path.dirname(sys.executable)
         elif __file__:
             self.app_path = os.path.dirname(__file__)
+        
+        self.sct = sct
         self.config = config
         self.root = Tk()
-        self.root.geometry(str(config.gui_width) + "x" + str(config.gui_height))
-        self.sct = sct
-     
+        self.root.winfo_toplevel().title("Realm of the Clear God")
         self.gui_width = config.gui_width
         self.gui_height = config.gui_height
+        self.use_overlay = self.config.use_overlay
+        self.is_tangible = True
+        self.input_thread = threading.Thread(target=self.detect_global_key)
+        self.input_thread.daemon = True
+        self.input_thread.start()
+        self.make_click_through = False
+        
+        self.peasant_mode = self.config.peasant_mode
+        self.exit_key = config.exit_key
+        self.pause_key = config.pause_key
+        self.fullsync_key = config.fullsync_key
+        
+        self.use_pos_reader = config.use_pos_reader
+        self.mark_key = config.mark_key
+        
+        if self.use_pos_reader:
+            self.pos_reader = PosReader()
+            pub.subscribe(self.toggleCircle, "toggle")
+        
+        if self.peasant_mode:
+            self.make_click_through = True
+            self.root.attributes('-topmost', True)
+            self.root.overrideredirect(True)
+            self.gui_width = config.minimap_width
+            self.gui_height = config.minimap_height
+            self.use_overlay = False
+            self.root.geometry("{}x{}+{}+{}".format(self.gui_width, self.gui_height, config.map_x, config.map_y))
+            self.root.attributes('-alpha', "{:.2f}".format((self.config.alpha * 1.0) / 255))
+            pub.subscribe(self.toggle_pause, "pauseKey")
+            pub.subscribe(self.exit, "quitKey")
+            pub.subscribe(self.relayFullsync, "requestFullsync")
+        else:
+            self.root.geometry(str(self.gui_width) + "x" + str(self.gui_height))
         self.canvas = Canvas(self.root, width=self.gui_width, height=self.gui_height)
         self.canvas.pack()
         self.init_maps_pis()
@@ -76,7 +284,6 @@ class MYGUI:
             pub.subscribe(self.fullSync, "FullSync")
             pub.subscribe(self.partialSync, "PartialSync")
         
-        self.use_overlay = self.config.use_overlay
         if self.use_overlay:
             self.minimap_area = {
                 "top": self.config.map_y,
@@ -92,7 +299,7 @@ class MYGUI:
         self.root.bind("<Button 3>", self.right_click)
         self.root.bind("<Right>", self.next_map)
         self.root.bind("<Left>", self.prev_map)
-        self.root.bind("<Key>", self.process_key_press)
+        self.root.bind("<Key>", self.process_key_press_event)
         
         self.estimate_text = "Marked Heroes: 0 "
         self.heroEstimateLabel = Label(self.root, bg="black", fg="#03fc62", font=("Arial", 25), text=self.estimate_text)
@@ -106,12 +313,56 @@ class MYGUI:
             self.root.bind("<space>", self.toggle_pause)
             self.update_clock()
         self.root.mainloop()
+    
+    def relayFullsync(self):
+        self.process_key_press("s")
+    
+    def exit(self):
+        self.root.destroy()
+    
+    def toggleCircle(self):
+        player_x, player_y = self.pos_reader.get_xy()
+        predicted_map_x = 0.5875 * player_x + 99.2
+        predicted_map_y = 0.601 * player_y + 104
+        player_x = int(player_x)
+        player_y = int(player_y)
         
+        widthRatio = self.gui_width / self.config.map_width
+        heightRatio = self.gui_height / self.config.map_height
+        
+        predicted_x = predicted_map_x * widthRatio
+        predicted_y = predicted_map_y * heightRatio
+    
+        c = (predicted_x, predicted_y)
+
+        circleId = self.maybe_get_closest_circle_id(c, self.marker_activation_radius * 2)
+        if circleId >= 0:
+            self.protected_markers[circleId] = time.time()
+            currentCirclePiId = self.markerPiIdxs[circleId]
+            newCirclePiId = (currentCirclePiId + 1) % 3
+            self.markerPiIdxs[circleId] = newCirclePiId
+            circlePI = self.markerPIs[newCirclePiId]
+            self.canvas.itemconfig(self.markers[circleId], image=circlePI)
+            if self.use_network:
+                self.uploadMarker(circleId, newCirclePiId)
+        self.update_hero_estimate()  
+    
     def toggle_pause(self, e):
         if self.running:
             self.pauseLabel.place(relx=0.5, rely=0.5, anchor='center')
             self.running = False
+            if self.peasant_mode:
+                self.root.geometry("1x1")
         else:
+            if self.make_click_through:
+                hwnd = win32gui.FindWindow(None, "Realm of the Clear God")
+                INTANGIBLE = 0x800A8
+                win32gui.SetWindowLong(hwnd, win32con.GWL_EXSTYLE, INTANGIBLE)
+                self.make_click_through = False
+                
+            if self.peasant_mode:
+                self.root.geometry(str(self.gui_width) + "x" + str(self.gui_height))
+                
             self.pauseLabel.place_forget()
             self.running = True
             self.update_clock()
@@ -228,6 +479,20 @@ class MYGUI:
             pi = ImageTk.PhotoImage(smaller_map)
             self.mapPIs.append(pi)
     
+    def detect_global_key(self):
+        while True:
+            readKey = keyboard.read_key()
+            if readKey == self.pause_key:
+                pub.sendMessage('pauseKey', e=None)
+                time.sleep(0.3)
+            if readKey == self.exit_key:
+                pub.sendMessage('quitKey')
+            if readKey == self.fullsync_key:
+                pub.sendMessage('requestFullsync')
+                time.sleep(0.3)
+            if readKey == self.mark_key:
+                pub.sendMessage("toggle")
+                time.sleep(0.15)
     def next_map(self, event):
         self.set_map((self.mapIdx + 1) % 13)
         self.update_hero_estimate()
@@ -248,19 +513,23 @@ class MYGUI:
         self.clear_markers()
         self.draw_markers()
         
-    def process_key_press(self, event):
+    def process_key_press_event(self, event):
         if not self.use_network:
             return
         key = event.char
+        self.process_key_press(key)
+    
+    def process_key_press(self, key):
         if key in ["s", "S"]:
             self.fullSyncComm = Communicator(self.endpoint, queue="FullSync")
             self.fullSyncComm.start()
         if key in ["u", "U"]:
             self.uploadAllData()
+            
         
     def left_click(self, event):
         c = (event.x, event.y)
-        circleId = self.maybe_get_closest_circle_id(c)
+        circleId = self.maybe_get_closest_circle_id(c, self.marker_activation_radius)
         if circleId >= 0:
             self.protected_markers[circleId] = time.time()
             if self.markerPiIdxs[circleId] != 1:
@@ -277,7 +546,7 @@ class MYGUI:
         
     def right_click(self, event):
         c = (event.x, event.y)
-        circleId = self.maybe_get_closest_circle_id(c)
+        circleId = self.maybe_get_closest_circle_id(c, self.marker_activation_radius)
         if circleId >= 0:
             self.protected_markers[circleId] = time.time()
             if self.markerPiIdxs[circleId] != -1:
@@ -303,9 +572,9 @@ class MYGUI:
                 bestDistance = d
         return (bestIdx, bestDistance)
         
-    def maybe_get_closest_circle_id(self, c):
+    def maybe_get_closest_circle_id(self, c, max_dist):
         circleIdx, dst = self.least_distance(c)
-        if dst < self.marker_activation_radius:
+        if dst < max_dist:
             return circleIdx
         return -1
         

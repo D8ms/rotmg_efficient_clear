@@ -6,15 +6,16 @@ distlib==0.3.3
 filelock==3.4.0
 future==0.18.2
 idna==3.3
+keyboard==0.13.5
 mss==6.1.0
 numpy==1.21.4
 opencv-python==4.5.4.60
 pefile==2021.9.3
 Pillow==8.4.0
 platformdirs==2.4.0
-pypiwin32==223
 Pypubsub==4.0.3
 pywin32==302
+pywin32-ctypes==0.2.0
 requests==2.26.0
 six==1.16.0
 urllib3==1.26.7
