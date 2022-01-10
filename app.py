@@ -16,7 +16,7 @@ import string
 
 import win32gui
 import win32con
-import keyboard
+from pynput.keyboard import Key, Listener, Controller
 
 from ctypes import c_long , c_int , c_uint , c_char , c_ubyte , c_char_p , c_void_p
 from ctypes import windll, Structure, sizeof, POINTER, pointer, cast, byref, create_string_buffer, addressof, WinDLL, c_size_t, c_void_p
@@ -37,7 +37,8 @@ class AppConfig:
         self.gui_width = int(config['GUI_WIDTH'])
         self.gui_height = int(config['GUI_HEIGHT'])
         self.gui_refresh_rate = int(config['GUI_REFRESH_RATE'])
-        self.use_pos_reader = config['use_pos_reader'].lower().strip() == 'true'
+        self.use_pos_reader = config['USE_POS_READER'].lower().strip() == 'true'
+        self.half_ptr_size = config['HALF_PTR_SIZE'].lower().strip() == 'true'
         self.mark_key = config['MARK_KEY'].strip()
         
         
@@ -60,9 +61,9 @@ class AppConfig:
         
         config = _config['PeasantMode']
         self.peasant_mode = config['PEASANT_MODE'].lower().strip() == 'true'
-        self.exit_key = config['EXIT_KEY'].strip()
-        self.pause_key = config['PAUSE_KEY'].strip()
-        self.fullsync_key = config['FULLSYNC_KEY'].strip()
+        self.exit_key = config['EXIT_KEY'].strip().lower()
+        self.pause_key = config['PAUSE_KEY'].strip().lower()
+        self.fullsync_key = config['FULLSYNC_KEY'].strip().lower()
 
 
 class MODULEENTRY32(Structure):
@@ -78,9 +79,10 @@ class MODULEENTRY32(Structure):
                 ( 'szExePath' , c_char * 260 ) ]
 
 class PosReader:
-    def __init__(self):
+    def __init__(self, half_ptr_size):
         self.app_name = "RotMGExalt"
         self.module_name = "UnityPlayer.dll"
+        self.half_ptr_size = half_ptr_size
         self.clear_cache()
         
     def clear_cache(self):
@@ -175,7 +177,7 @@ class PosReader:
         
             ptr_size = struct.calcsize("P")
             unpack_flag = "<Q"
-            if ptr_size == 4:
+            if self.half_ptr_size:
                 unpack_flag = "<L"
             
             address = self.read_process_memory(base_addr + OFFSET1, ptr_size, process)
@@ -235,9 +237,9 @@ class MYGUI:
         self.gui_height = config.gui_height
         self.use_overlay = self.config.use_overlay
         self.is_tangible = True
-        self.input_thread = threading.Thread(target=self.detect_global_key)
-        self.input_thread.daemon = True
-        self.input_thread.start()
+        self.held_keys = set()
+        self.listener = Listener(on_press=self.detect_key_down, on_release=self.detect_key_up, suppress=False)
+        self.listener.start()
         self.make_click_through = False
         
         self.peasant_mode = self.config.peasant_mode
@@ -249,7 +251,7 @@ class MYGUI:
         self.mark_key = config.mark_key
         
         if self.use_pos_reader:
-            self.pos_reader = PosReader()
+            self.pos_reader = PosReader(self.config.half_ptr_size)
             pub.subscribe(self.toggleCircle, "toggle")
         
         if self.peasant_mode:
@@ -458,7 +460,7 @@ class MYGUI:
     def update_hero_estimate(self):
         est = 0
         for i in self.markerPiIdxs:
-            if i > 0:
+            if i % 3 == 1:
                 est += 1
         est = str(est)
         if len(est) < 2:
@@ -479,20 +481,48 @@ class MYGUI:
             pi = ImageTk.PhotoImage(smaller_map)
             self.mapPIs.append(pi)
     
-    def detect_global_key(self):
-        while True:
-            readKey = keyboard.read_key()
-            if readKey == self.pause_key:
-                pub.sendMessage('pauseKey', e=None)
-                time.sleep(0.3)
-            if readKey == self.exit_key:
-                pub.sendMessage('quitKey')
-            if readKey == self.fullsync_key:
-                pub.sendMessage('requestFullsync')
-                time.sleep(0.3)
-            if readKey == self.mark_key:
-                pub.sendMessage("toggle")
-                time.sleep(0.15)
+    def process_key(self, key):
+        try:
+            readKey = str(key)
+            if readKey[0] == '\'':
+                readKey = readKey[1:-1]
+        except AttributeError:
+            sys.stdout.flush()
+            if readKey.startswith("Key."):
+                readKey = readKey[4:]
+        readKey = readKey.lower()
+        if readKey.startswith("key."):
+            readKey = readKey[4:]
+        return readKey
+    
+    def detect_key_down(self, key):
+        readKey = self.process_key(key)
+        if readKey in self.held_keys:
+            return
+        print("Pressed: " + readKey)
+        sys.stdout.flush()        
+        if readKey == self.pause_key:
+            pub.sendMessage('pauseKey', e=None)
+        elif readKey == self.exit_key:
+            pub.sendMessage('quitKey')
+        elif readKey == self.fullsync_key:
+            pub.sendMessage('requestFullsync')
+        elif readKey == self.mark_key:
+            pub.sendMessage("toggle")
+        else:
+            return
+        self.held_keys.add(readKey)
+        
+    def detect_key_up(self, key):
+        readKey = self.process_key(key)
+        if readKey in [self.pause_key, self.exit_key, self.fullsync_key, self.mark_key]:
+            try:
+                self.held_keys.remove(readKey)
+            except Exception as e:
+                print(e)
+                sys.stdout.flush()
+                self.held_keys.clear()
+            
     def next_map(self, event):
         self.set_map((self.mapIdx + 1) % 13)
         self.update_hero_estimate()
