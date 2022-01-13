@@ -394,7 +394,8 @@ class MYGUI:
         whitePi = ImageTk.PhotoImage(Image.open(mapCoord_path + 'whitemark.png').resize((markerWidth, markerHeight)))
         greenPi = ImageTk.PhotoImage(Image.open(mapCoord_path + 'greenmark.png').resize((markerWidth, markerHeight)))
         redPi = ImageTk.PhotoImage(Image.open(mapCoord_path + 'redmark.png').resize((markerWidth, markerHeight)))
-        self.markerPIs = [whitePi, greenPi, redPi]
+        starPi = ImageTk.PhotoImage(Image.open(mapCoord_path + 'starmark.png').resize((markerWidth, markerHeight)))
+        self.markerPIs = [whitePi, greenPi, redPi, starPi]
         self.mapToMarkerCoords = []
         self.markerPiIdxs = [0] * 128
         self.markers = []
@@ -593,10 +594,12 @@ class MYGUI:
         circleId = self.maybe_get_closest_circle_id(c, self.marker_activation_radius)
         if circleId >= 0:
             self.protected_markers[circleId] = time.time()
-            if self.markerPiIdxs[circleId] != -1:
-                newCirclePiId = -1
-            else:
+            if self.markerPiIdxs[circleId] == 1 | self.markerPiIdxs[circleId] == 3:
                 newCirclePiId = 0
+            elif self.markerPiIdxs[circleId] == 2:
+                newCirclePiId = 3
+            else:
+                newCirclePiId = 2
             self.markerPiIdxs[circleId] = newCirclePiId
             circlePI = self.markerPIs[newCirclePiId]
             self.canvas.itemconfig(self.markers[circleId], image=circlePI)
@@ -682,7 +685,7 @@ class MYGUI:
         
         #data should only sync if you are on the same map as the server
     def updateMapSyncSignal(self, serverMapIdx):
-        circlePiIdx = -1
+        circlePiIdx = 2
         if serverMapIdx == self.mapIdx:
             circlePiIdx = 1
         self.canvas.itemconfig(self.syncMarker, image=self.markerPIs[circlePiIdx]) 
