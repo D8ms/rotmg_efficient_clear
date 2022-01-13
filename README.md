@@ -16,15 +16,36 @@ Once you have it, please make necessary changes to config.ini before running. **
 
 # Controls:
 Space - Toggle pause
+
 Left and Right arrow - cycle through maps
+
 Left Click - Sets marker to green (denotes a hero is alive at this location)
+
 Right Click - Sets marker to red (denotes this location has no hero)
+
+T - Toggles the color of the closest nearby marker (Rebindable in config, a Windows-only feature)
+
 S - Download and sync data from server (This will change your map and markers to what the server has. Use this if you join a run)
+
 U - Uploads your current map data (map number and marker statuses) to the server
 For networking the circle at the bottom right should tell you what your status is:
   White - You are not connected to a server
   Green - You are connected to the server; you are on the correct map; your left/right clicks will be uploaded to the server
   Red - You are connected to the server, but not on the right map. You can overwrite the server's data with **U** or sync with **S**
+
+
+# Peasant Mode: (WINDOWS ONLY)
+Enabling this overlays the application ontop of your minimap. You will be able to "click through" the app, so it will not stop you from TP'ing to other players. Since you are unable to click (focus) the app in this mode, there are alternative hotkeys (All changable):
+
+F1 - Pause/Unpause (Pausing the app will automatically hide it)
+
+F2 - Download and sync data from server
+
+F5 - Quit
+
+T - Toggles the color of the closest nearby marker (Rebindable in config, a Windows-only feature)
+
+You cannot change maps or upload while in this mode. This is a feature to prevent players from accidentally screwing up the map while typing.
 
 # config.ini
 **GUI_WIDTH and GUI_HEIGHT**
@@ -70,5 +91,5 @@ Transparency of the overlay (0-255)
 **OVERLAY_REFRESH_RATE**
 How frequently the app should read your map. You can set this to 10 to 60 if you have a decent computer. This value should be higher than **GUI_REFRESH_RATE**
 
-# Update Logs
-December 6: Fixed missing marker on Map 10, added MacOs version
+**PEASANT MODE** (WINDOWS ONLY)
+Should Peasant Mode be enabled
