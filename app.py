@@ -671,7 +671,7 @@ class MYGUI:
         
         #data should only sync if you are on the same map as the server
     def updateMapSyncSignal(self, serverMapIdx):
-        circlePiIdx = -1
+        circlePiIdx = 2
         if serverMapIdx == self.mapIdx:
             circlePiIdx = 1
         self.canvas.itemconfig(self.syncMarker, image=self.markerPIs[circlePiIdx]) 
