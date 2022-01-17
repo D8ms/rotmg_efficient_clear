@@ -1,4 +1,4 @@
-from tkinter import Tk, Canvas, NW, CENTER, Button, Label, Text
+from tkinter import Tk, Canvas, NW, CENTER, Button, Label, Text, Toplevel, Button, ttk, LEFT, RIGHT, BOTTOM
 from PIL import Image, ImageFilter, ImageTk
 import cv2
 import numpy
@@ -221,6 +221,19 @@ class PosReader:
             if not allow_partial or e.winerror != ERROR_PARTIAL_COPY:
                 raise
         return buf[:nread.value]               
+
+class PeasantOperator(Toplevel):
+    def __init__(self, parent, main_app):
+        super().__init__(parent)
+        self.main_app = main_app
+        self.parent = parent
+        self.geometry('250x150')
+        self.protocol("WM_DELETE_WINDOW", self.iconify)
+        ttk.Button(self, text="Prev", command=lambda: self.main_app.prev_map(None)).pack(side=LEFT)
+        ttk.Button(self, text="Next", command=lambda: self.main_app.next_map(None)).pack(side=RIGHT)
+        ttk.Button(self, text="Upload", command=lambda: self.main_app.uploadAllData()).pack(side=BOTTOM)
+    def null_op(self):
+        return
         
 class MYGUI:
     def __init__(self, config, sct):
@@ -255,6 +268,7 @@ class MYGUI:
             pub.subscribe(self.toggleCircle, "toggle")
         
         if self.peasant_mode:
+            self.ctrl = PeasantOperator(self.root, self)
             self.make_click_through = True
             self.root.attributes('-topmost', True)
             self.root.overrideredirect(True)
@@ -522,7 +536,7 @@ class MYGUI:
                 print(e)
                 sys.stdout.flush()
                 self.held_keys.clear()
-            
+    
     def next_map(self, event):
         self.set_map((self.mapIdx + 1) % 13)
         self.update_hero_estimate()
