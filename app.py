@@ -210,6 +210,8 @@ class MYGUI:
         for i in self.markerPiIdxs:
             if i > 0:
                 est += 1
+            elif i == 3:
+                est += 1
         est = str(est)
         if len(est) < 2:
             est += " "
