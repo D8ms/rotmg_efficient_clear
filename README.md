@@ -9,8 +9,8 @@ Networking allows you to share your markers with friends
 There are two ways to "install" this package
 1. Pull repository, install packages from requriements.txt (probably a few unnecessary ones) and run with python 3.8.8 (or later)
 2. Download the whole package 
-    https://mega.nz/file/B4s1WYJC#e4Wlep58WvhDkemnHcr5WVp52mi4Cfq1qPNBOruJVFE (Windows)
-    https://mega.nz/file/lkcjXYSB#LqsVv3f3ZVJsoeVGCZwg-IeQUcHG7XP67wUm7AUBoyQ (MacOS)
+    https://mega.nz/file/l9MkBBQB#byLwPSQ0lkpfChvOG8taKSoPXh3budcgkj13ZP-t-A8 (Windows)
+    https://mega.nz/file/MoNF0aZb#hjBH6Goyv-mDN717vmlfyQ5U5Vcrik_C4eNMvzBtaxo (MacOS)
 
 Once you have it, please make necessary changes to config.ini before running. **You will likely have to change these values: MINIMAP_WIDTH, MINIMAP_HEIGHT, MAP_X, MAP_Y, ROOM.** See bottom for full explanation of config settings.
 
