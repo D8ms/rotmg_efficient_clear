@@ -1,4 +1,6 @@
 from tkinter import Tk, Canvas, NW, CENTER, Button, Label, Text
+
+import keyboard
 from PIL import Image, ImageFilter, ImageTk
 import cv2
 import numpy
@@ -17,6 +19,7 @@ import string
 import win32gui
 import win32con
 from pynput.keyboard import Key, Listener, Controller
+from pynput.mouse import Button, Listener as l
 
 from ctypes import c_long , c_int , c_uint , c_char , c_ubyte , c_char_p , c_void_p
 from ctypes import windll, Structure, sizeof, POINTER, pointer, cast, byref, create_string_buffer, addressof, WinDLL, c_size_t, c_void_p
@@ -81,7 +84,7 @@ class MODULEENTRY32(Structure):
 class PosReader:
     def __init__(self, half_ptr_size):
         self.app_name = "RotMGExalt"
-        self.module_name = "UnityPlayer.dll"
+        self.module_name = "GameAssembly.dll"
         self.half_ptr_size = half_ptr_size
         self.clear_cache()
         
@@ -170,11 +173,12 @@ class PosReader:
             if not process:
                 print("No process")
                 return None
-            OFFSET1 = 0x017D59F8
-            OFFSET2 = 0x10
-            OFFSET3 = 0x140
-            OFFSET4 = 0x90
-        
+            OFFSET1 = 0x03AF7AA0
+            OFFSET2 = 0x280
+            OFFSET3 = 0x6C0
+            OFFSET4 = 0x180
+            OFFSET5 = 0x548
+
             ptr_size = struct.calcsize("P")
             unpack_flag = "<Q"
             if self.half_ptr_size:
@@ -186,7 +190,9 @@ class PosReader:
             address = struct.unpack(unpack_flag, address)[0]
             address = self.read_process_memory(address + OFFSET3, ptr_size, process)
             address = struct.unpack(unpack_flag, address)[0]
-            self.final_addr = address + OFFSET4
+            address = self.read_process_memory(address + OFFSET4, ptr_size, process)
+            address = struct.unpack(unpack_flag, address)[0]
+            self.final_addr = address + OFFSET5
         return self.final_addr
     
     def get_xy(self):
@@ -239,6 +245,9 @@ class MYGUI:
         self.is_tangible = True
         self.held_keys = set()
         self.listener = Listener(on_press=self.detect_key_down, on_release=self.detect_key_up, suppress=False)
+        self.input_thread = threading.Thread(target=self.detect_global_key)
+        self.input_thread.daemon = True
+        self.input_thread.start()
         self.listener.start()
         self.make_click_through = False
         
@@ -481,7 +490,49 @@ class MYGUI:
             smaller_map = map.resize((self.gui_width, self.gui_height))
             pi = ImageTk.PhotoImage(smaller_map)
             self.mapPIs.append(pi)
-    
+
+    def detect_global_key(self):
+        def getC():
+            player_x, player_y = self.pos_reader.get_xy()
+            predicted_map_x = 0.5875 * player_x + 99.2
+            predicted_map_y = 0.601 * player_y + 104
+            widthRatio = self.gui_width / self.config.map_width
+            heightRatio = self.gui_height / self.config.map_height
+            predicted_x = predicted_map_x * widthRatio
+            predicted_y = predicted_map_y * heightRatio
+            return (predicted_x, predicted_y)
+
+        def setRedGreen(num):
+            circleId = self.maybe_get_closest_circle_id(getC(), self.marker_activation_radius)
+            if circleId >= 0:
+                self.protected_markers[circleId] = time.time()
+                if self.markerPiIdxs[circleId] != num:
+                    newCirclePiId = num
+                else:
+                    newCirclePiId = num
+                self.markerPiIdxs[circleId] = newCirclePiId
+                circlePI = self.markerPIs[newCirclePiId]
+                self.canvas.itemconfig(self.markers[circleId], image=circlePI)
+                if self.use_network:
+                    self.uploadMarker(circleId, newCirclePiId)
+            self.update_hero_estimate()
+
+        def on_release(key):
+            pass
+
+        def on_click(x, y, button, pressed):
+            if pressed & (button == Button.left) & keyboard.is_pressed('shift'):
+                setRedGreen(1)
+
+            elif pressed & (button == Button.right) & keyboard.is_pressed('shift'):
+                setRedGreen(2)
+
+        with l(on_click=on_click) as L:
+            # Collect events until released
+            with Listener(on_release=on_release) as listener:
+                listener.join()
+                L.join()
+
     def process_key(self, key):
         try:
             readKey = str(key)
@@ -500,8 +551,8 @@ class MYGUI:
         readKey = self.process_key(key)
         if readKey in self.held_keys:
             return
-        print("Pressed: " + readKey)
-        sys.stdout.flush()        
+        #print("Pressed: " + readKey)
+        sys.stdout.flush()
         if readKey == self.pause_key:
             pub.sendMessage('pauseKey', e=None)
         elif readKey == self.exit_key:
@@ -572,7 +623,7 @@ class MYGUI:
             self.canvas.itemconfig(self.markers[circleId], image=circlePI)
             if self.use_network:
                 self.uploadMarker(circleId, newCirclePiId)
-        self.update_hero_estimate()   
+        self.update_hero_estimate()
          
         
     def right_click(self, event):
