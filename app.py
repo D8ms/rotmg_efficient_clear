@@ -84,7 +84,7 @@ class MODULEENTRY32(Structure):
 class PosReader:
     def __init__(self, half_ptr_size):
         self.app_name = "RotMGExalt"
-        self.module_name = "GameAssembly.dll"
+        self.module_name = "UnityPlayer.dll"
         self.half_ptr_size = half_ptr_size
         self.clear_cache()
         
@@ -173,11 +173,14 @@ class PosReader:
             if not process:
                 print("No process")
                 return None
-            OFFSET1 = 0x03AF7AA0
-            OFFSET2 = 0x280
-            OFFSET3 = 0x6C0
-            OFFSET4 = 0x180
-            OFFSET5 = 0x548
+
+            OFFSET1 = 0x01ABACB8
+            OFFSET2 = 0x470
+#            OFFSET3 = 0x0
+#            OFFSET4 = 0x18
+#            OFFSET5 = 0xA8
+#            OFFSET6 = 0x2A0
+#            OFFSET7 = 0x548
 
             ptr_size = struct.calcsize("P")
             unpack_flag = "<Q"
@@ -186,13 +189,17 @@ class PosReader:
             
             address = self.read_process_memory(base_addr + OFFSET1, ptr_size, process)
             address = struct.unpack(unpack_flag, address)[0]
-            address = self.read_process_memory(address + OFFSET2, ptr_size, process)
-            address = struct.unpack(unpack_flag, address)[0]
-            address = self.read_process_memory(address + OFFSET3, ptr_size, process)
-            address = struct.unpack(unpack_flag, address)[0]
-            address = self.read_process_memory(address + OFFSET4, ptr_size, process)
-            address = struct.unpack(unpack_flag, address)[0]
-            self.final_addr = address + OFFSET5
+#            address = self.read_process_memory(address + OFFSET2, ptr_size, process)
+#            address = struct.unpack(unpack_flag, address)[0]
+#            address = self.read_process_memory(address + OFFSET3, ptr_size, process)
+#            address = struct.unpack(unpack_flag, address)[0]
+#            address = self.read_process_memory(address + OFFSET4, ptr_size, process)
+#            address = struct.unpack(unpack_flag, address)[0]
+#            address = self.read_process_memory(address + OFFSET5, ptr_size, process)
+#            address = struct.unpack(unpack_flag, address)[0]
+#            address = self.read_process_memory(address + OFFSET6, ptr_size, process)
+#            address = struct.unpack(unpack_flag, address)[0]
+            self.final_addr = address + OFFSET2
         return self.final_addr
     
     def get_xy(self):
